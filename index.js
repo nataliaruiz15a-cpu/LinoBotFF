@@ -21,12 +21,16 @@ const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
-        dumpio: true, 
         args: [
-            '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-            '--no-first-run', '--no-zygote', '--single-process', '--disable-gpu'
+            '--no-sandbox', 
+            '--disable-setuid-sandbox', 
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu'
         ] 
-    }
+    },
+    // 🔥 EL TRUCO ANTI-CONGELAMIENTO 🔥
+    webVersionCache: { type: 'none' } 
 });
 
 const BOT_NAME = '🤖 *Lino bot*';
@@ -40,7 +44,6 @@ client.on('ready', () => {
     console.log('✅ Lino bot está 100% activo.');
 });
 
-// --- BIENVENIDA ---
 client.on('group_join', async (notification) => {
     const chat = await notification.getChat();
     for (let user of notification.recipientIds) {
@@ -48,7 +51,6 @@ client.on('group_join', async (notification) => {
     }
 });
 
-// --- DESPEDIDA ---
 client.on('group_leave', async (notification) => {
     const chat = await notification.getChat();
     for (let user of notification.recipientIds) {
@@ -56,7 +58,6 @@ client.on('group_leave', async (notification) => {
     }
 });
 
-// --- 👑 AVISO AUTOMÁTICO DE NUEVO ADMIN 👑 ---
 client.on('group_admin_changed', async (notification) => {
     if (notification.action === 'promote') {
         const chat = await notification.getChat();
@@ -84,11 +85,9 @@ client.on('message', async msg => {
 
     if (!esAdmin) return; 
 
-    // --- 🔥 EL SÚPER MENÚ 🔥 ---
     if (comando === '.menu' || comando === '!menu' || comando === '.help') {
         const opciones = { day: '2-digit', month: '2-digit', year: 'numeric' };
         const fecha = new Date().toLocaleDateString('es-MX', opciones);
-        
         const leerMas = String.fromCharCode(8206).repeat(4000);
 
         const menuTexto = `🫧゜・☆。。・゜゜🔥・。☆。・゜🫧
@@ -234,7 +233,6 @@ client.on('message', async msg => {
         chat.sendMessage(menuTexto, { mentions: [authorId] });
     }
 
-    // --- 📢 COMANDO PARA ANUNCIOS (.n o !n) ---
     if (comando === '.n' || comando === '!n') {
         if(!args) return msg.reply('❌ Escribe el anuncio que quieres dar.');
         const opciones = { day: 'numeric', month: 'long' };
@@ -243,7 +241,6 @@ client.on('message', async msg => {
         chat.sendMessage(mensaje);
     }
 
-    // --- 🔥 COMANDO PARA ETIQUETAR A TODOS ---
     if (comando === '.todos' || comando === '!todos') {
         let menciones = [];
         let lista = `┌─『 📢 ${args || 'LLAMADO GENERAL'} 』─┐\n`;
