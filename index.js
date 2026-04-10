@@ -3,25 +3,29 @@ const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs'); 
 
-// --- SERVIDOR FANTASMA PARA LA NUBE ---
 const app = express();
 app.get('/', (req, res) => res.send('☁️ Lino bot está vivo en la nube'));
-app.listen(process.env.PORT || 3000, () => console.log('Servidor web activo.'));
+app.listen(process.env.PORT || 3000, () => console.log('✅ Servidor activo.'));
 
-// --- MEMORIA ---
 const configPath = './config.json';
 let config = { 
-    bienvenida: "¡Bienvenido al grupo de insanos! 👊", 
+    bienvenida: "¡Bienvenido al grupo de insanos! 👊 Presentate con nombre y foto.", 
     despedida: "Se fue al lobby... 👋" 
 };
 if (fs.existsSync(configPath)) { config = JSON.parse(fs.readFileSync(configPath)); }
 const guardarConfig = () => fs.writeFileSync(configPath, JSON.stringify(config));
 
-// --- CONFIGURACIÓN PARA LINUX (NUBE) ---
+console.log('⏳ Iniciando Lino bot...');
+
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+        headless: true,
+        dumpio: true, 
+        args: [
+            '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+            '--no-first-run', '--no-zygote', '--single-process', '--disable-gpu'
+        ] 
     }
 });
 
@@ -29,24 +33,22 @@ const BOT_NAME = '🤖 *Lino bot*';
 
 client.on('qr', (qr) => {
     qrcode.generate(qr, {small: true});
-    console.log('📱 ESCANEA ESTE QR RÁPIDO CON EL CELULAR DEL BOT');
+    console.log('📱 ESCANEA ESTE QR RÁPIDO:');
 });
 
 client.on('ready', () => {
     console.log('✅ Lino bot está 100% activo.');
 });
 
-// --- ENTRADAS Y SALIDAS ---
+// --- BIENVENIDA ---
 client.on('group_join', async (notification) => {
     const chat = await notification.getChat();
     for (let user of notification.recipientIds) {
         chat.sendMessage(`${BOT_NAME}\n\n${config.bienvenida}\n@${user.split('@')[0]}`, { mentions: [user] });
-        if(fs.existsSync('./audios/bienvenido.mp3')){
-            chat.sendMessage(MessageMedia.fromFilePath('./audios/bienvenido.mp3'), { sendAudioAsVoice: true });
-        }
     }
 });
 
+// --- DESPEDIDA ---
 client.on('group_leave', async (notification) => {
     const chat = await notification.getChat();
     for (let user of notification.recipientIds) {
@@ -54,80 +56,215 @@ client.on('group_leave', async (notification) => {
     }
 });
 
-// --- MENSAJES Y COMANDOS ---
+// --- 👑 AVISO AUTOMÁTICO DE NUEVO ADMIN 👑 ---
+client.on('group_admin_changed', async (notification) => {
+    if (notification.action === 'promote') {
+        const chat = await notification.getChat();
+        const promoterId = notification.author; 
+        
+        for (let adminId of notification.recipientIds) {
+            const mensaje = `┌─『 👑 NUEVO ADMIN 』─┐\n│ 👤 Usuario:\n│ @${adminId.split('@')[0]}\n│ ✅ Ascendido por:\n│ @${promoterId.split('@')[0]}\n└──────────────┘`;
+            chat.sendMessage(mensaje, { mentions: [adminId, promoterId] });
+        }
+    }
+});
+
 client.on('message', async msg => {
     const chat = await msg.getChat();
     if (!chat.isGroup) return;
 
-    const texto = msg.body.toLowerCase();
+    if (!msg.body.startsWith('!') && !msg.body.startsWith('.')) return;
 
-    // 🎵 AUDIOS
-    if (texto.includes('feliz jueves') && fs.existsSync('./audios/jueves.mp3')) {
-        msg.reply(MessageMedia.fromFilePath('./audios/jueves.mp3'), null, { sendAudioAsVoice: true });
-    }
-    if (texto === 'hola' && fs.existsSync('./audios/hola.mp3')) {
-        msg.reply(MessageMedia.fromFilePath('./audios/hola.mp3'), null, { sendAudioAsVoice: true });
-    }
-
-    if (!msg.body.startsWith('!')) return;
-
-    // VALIDACIÓN DE ADMIN
-    const contact = await msg.getContact();
     const authorId = msg.author || msg.from;
-    const esAdmin = chat.participants.some(p => 
-        (p.id._serialized === authorId || p.id._serialized === contact.id._serialized) && (p.isAdmin || p.isSuperAdmin)
-    );
+    const esAdmin = chat.participants.some(p => p.id._serialized === authorId && (p.isAdmin || p.isSuperAdmin));
 
-    if (!esAdmin) return;
-
-    const comando = msg.body.toLowerCase().split(' ')[0];
+    const texto = msg.body.toLowerCase();
+    const comando = texto.split(' ')[0]; 
     const args = msg.body.split(' ').slice(1).join(' ');
-    const part = chat.participants;
 
-    if (comando === '!menu' || comando === '!ayuda') {
-        msg.reply(`${BOT_NAME} - PANEL\n\n🎮 *Juegos*\n!pvp\n!ruleta\n!pareja\n!infiel\n!sorteo\n!porcentaje [algo]\n\n⚙️ *Control*\n!setbienvenida [texto]\n!setdespedida [texto]\n!silenciar\n!abrir\n!nombre [nuevo]\n!sacar (respondiendo a alguien)`);
+    if (!esAdmin) return; 
+
+    // --- 🔥 EL SÚPER MENÚ 🔥 ---
+    if (comando === '.menu' || comando === '!menu' || comando === '.help') {
+        const opciones = { day: '2-digit', month: '2-digit', year: 'numeric' };
+        const fecha = new Date().toLocaleDateString('es-MX', opciones);
+        
+        const leerMas = String.fromCharCode(8206).repeat(4000);
+
+        const menuTexto = `🫧゜・☆。。・゜゜🔥・。☆。・゜🫧
+𝐇𝐎𝐋𝐀, 𝐒𝐎𝐘 𝐋𝐈𝐍𝐎 𝐁𝐎𝐓 🤖
+╭┈────────────── 
+│ •≡ 𝑴𝒆𝒏𝒖: Completo
+│ •≡ 𝑼𝒔𝒖𝒂𝒓𝒊𝒐: @${authorId.split('@')[0]}
+│ •≡ 𝑭𝒆𝒄𝒉𝒂: ${fecha}
+│ •≡ 𝑴𝒐𝒅𝒐: Privado
+│ •≡ 𝑪𝒓𝒆𝒂𝒅𝒐𝒓𝒂: wa.me/5218716926709
+╰┈┈┈┈┈┈┈┈┈➤${leerMas}
+
+𝐏𝐀𝐑𝐀 𝐀𝐃𝐌𝐈𝐍𝐈𝐒𝐓𝐑𝐀𝐂𝐈Ó𝐍
+╭─────❀
+│🔥 .daradmins
+│🔥 .audioon/off
+│🔥 .welcomeaudio
+│🔥 .byeaudio
+│🔥 .welcomeaudioon/off
+│🔥 .quitaradmins
+│🔥 .kick
+│🔥 .kickall
+│🔥 .tag/n
+│🔥 .tagall
+│🔥 .todos
+│🔥 .invocar
+│🔥 .totalchat
+│🔥 .restchat
+│🔥 .fantasmas
+│🔥 .fankick
+│🔥 .delete
+│🔥 .linkgrupo
+│🔥 .mute
+│🔥 .unmute
+│🔥 .ban
+│🔥 .unban
+│🔥 .restpro
+│🔥 .abrirgrupo
+│🔥 .cerrargrupo
+│🔥 .infogrupo
+│🔥 .setinfo
+│🔥 .setname
+│🔥 .setwelcome
+│🔥 .setdespedidas
+│🔥 .settagemoji
+│🔥 .setfoto
+│🔥 .setreglas
+│🔥 .reglas
+│🔥 .welcome on/off
+│🔥 .despedidas on/off
+│🔥 .modoadmins on/off
+│🔥 .antilink on/off
+│🔥 .linkall on/off
+│🔥 .antis on/off
+│🔥 .antidelete on/off
+│🔥 .antiarabe on/off
+│🔥 .configrupo
+│🔥 .addco 
+│🔥 .delco 
+╰─────❀
+
+    ☁️*𝐈𝐍𝐅𝐎𝐑𝐌𝐀𝐂𝐈𝐎𝐍☁️
+╭─────❀
+│🔥 .menugrupo
+│🔥 .menuowner
+│🔥 .menufree
+│🔥 .menuventas
+│🔥 .ping
+│🔥 .creador
+│🔥 .help
+│🔥 .info
+╰─────❀
+
+     ☁️𝐌𝐈𝐍𝐈 𝐉𝐔𝐄𝐆𝐎𝐒☁️
+╭─────❀
+│🔥 .verdad / reto
+│🔥 .personalidad
+│🔥 .parejas / ship
+│🔥 .kiss / topkiss
+│🔥 .slap / topslap
+│🔥 .top
+│🔥 .topgay
+│🔥 .ahorcado
+│🔥 .doxeofull
+│🔥 .doxeo
+│🔥 .pajero
+│🔥 .acertijo
+│🔥 .consejo
+│🔥 .piropo
+│🔥 .pajeame
+│🔥 .sorteo
+│🔥 .sorteo2
+│🔥 .horario
+╰─────❀
+
+     ☁️𝐃𝐄𝐒𝐂𝐀𝐑𝐆𝐀𝐒☁️
+╭─────❀
+│🔥 .play
+│🔥 .play2
+│🔥 .ytmp3
+│🔥 .ytmp4
+│🔥 .ytmp3doc
+│🔥 .ytmp4doc
+│🔥 .tiktok
+│🔥 .fb
+│🔥 .ig
+│🔥 .spoti
+│🔥 .mediafire
+│🔥 .apk
+│🔥 .pin
+╰─────❀
+
+    ☁️𝐁𝐔𝐒𝐂𝐀𝐃𝐎𝐑𝐄𝐒☁️
+╭─────❀
+│🔥 .pixai
+│🔥 .tiktoksearch
+│🔥 .yts
+│🔥 .tiktokstalk
+╰─────❀
+
+    ☁️𝐇𝐄𝐑𝐑𝐀𝐌𝐈𝐄𝐍𝐓𝐀𝐒☁️
+╭─────❀
+│🔥 .s
+│🔥 .brat
+│🔥 .qc
+│🔥 .qc2
+│🔥 .texto
+│🔥 .tomp3
+│🔥 .toaudio
+│🔥 .hd
+│🔥 .tts
+│🔥 .tovideo
+│🔥 .toimg
+│🔥 .gifvideo
+│🔥 .ff / ff2
+│🔥 .ver
+│🔥 .perfil
+│🔥 .get
+│🔥 .tourl
+│🔥 .whatmusic
+╰─────❀`;
+
+        chat.sendMessage(menuTexto, { mentions: [authorId] });
     }
 
-    if (comando === '!setbienvenida') {
-        if(!args) return; config.bienvenida = args; guardarConfig(); msg.reply('✅ Bienvenida guardada.');
-    }
-    if (comando === '!setdespedida') {
-        if(!args) return; config.despedida = args; guardarConfig(); msg.reply('✅ Despedida guardada.');
+    // --- 📢 COMANDO PARA ANUNCIOS (.n o !n) ---
+    if (comando === '.n' || comando === '!n') {
+        if(!args) return msg.reply('❌ Escribe el anuncio que quieres dar.');
+        const opciones = { day: 'numeric', month: 'long' };
+        const fecha = new Date().toLocaleDateString('es-MX', opciones);
+        const mensaje = `${args}\n\n💘 © LINO BOT | ${fecha}`;
+        chat.sendMessage(mensaje);
     }
 
-    if (comando === '!pvp') {
-        const p1 = part[Math.floor(Math.random() * part.length)].id._serialized;
-        const p2 = part[Math.floor(Math.random() * part.length)].id._serialized;
-        chat.sendMessage(`⚔️ *PVP INSANO* ⚔️\n\n@${p1.split('@')[0]} VS @${p2.split('@')[0]}\n\n¿Quién ganará? 🩸`, { mentions: [p1, p2] });
+    // --- 🔥 COMANDO PARA ETIQUETAR A TODOS ---
+    if (comando === '.todos' || comando === '!todos') {
+        let menciones = [];
+        let lista = `┌─『 📢 ${args || 'LLAMADO GENERAL'} 』─┐\n`;
+        for (let participante of chat.participants) {
+            let id = participante.id._serialized;
+            menciones.push(id);
+            lista += `│ 🔥 @${id.split('@')[0]}\n`;
+        }
+        lista += `└──────────────┘`;
+        chat.sendMessage(lista, { mentions: menciones });
     }
-    if (comando === '!ruleta') {
-        msg.reply(Math.random() < 0.2 ? '💥 *PUM!* Te moriste.' : '💨 *Click...* Te salvaste.');
+
+    if (comando === '.setbienvenida' || comando === '!setbienvenida') {
+        if(!args) return msg.reply('❌ Escribe el mensaje después del comando.');
+        config.bienvenida = args; guardarConfig(); msg.reply('✅ Nueva bienvenida guardada.');
     }
-    if (comando === '!pareja') {
-        const p1 = part[Math.floor(Math.random() * part.length)].id._serialized;
-        const p2 = part[Math.floor(Math.random() * part.length)].id._serialized;
-        chat.sendMessage(`❤️ Pareja ideal:\n@${p1.split('@')[0]} y @${p2.split('@')[0]}`, { mentions: [p1, p2] });
-    }
-    if (comando === '!infiel') {
-        const infiel = part[Math.floor(Math.random() * part.length)].id._serialized;
-        chat.sendMessage(`🚨 @${infiel.split('@')[0]} es 99% infiel 👀`, { mentions: [infiel] });
-    }
-    if (comando === '!sorteo') {
-        const ganador = part[Math.floor(Math.random() * part.length)].id._serialized;
-        chat.sendMessage(`🎉 Ganador del sorteo: @${ganador.split('@')[0]} 💎`, { mentions: [ganador] });
-    }
-    if (comando === '!porcentaje') {
-        msg.reply(`📊 El porcentaje de ${args || 'insano'} es: *${Math.floor(Math.random() * 101)}%*`);
-    }
-    
-    if (comando === '!silenciar') { await chat.setMessagesAdminsOnly(true); msg.reply('🤫 Grupo silenciado.'); }
-    if (comando === '!abrir') { await chat.setMessagesAdminsOnly(false); msg.reply('🔊 Grupo abierto.'); }
-    if (comando === '!nombre' && args) { await chat.setSubject(args); msg.reply('✅ Nombre cambiado.'); }
-    if (comando === '!sacar' && msg.hasQuotedMsg) {
-        const quotedMsg = await msg.getQuotedMessage();
-        await chat.removeParticipants([quotedMsg.author || quotedMsg.from]);
-        msg.reply('✅ Jugador expulsado.');
+
+    if (comando === '.setdespedida' || comando === '!setdespedida') {
+        if(!args) return msg.reply('❌ Escribe el mensaje después del comando.');
+        config.despedida = args; guardarConfig(); msg.reply('✅ Nueva despedida guardada.');
     }
 });
 
-client.initialize();
+client.initialize().catch(err => console.error('❌ ERROR FATAL:', err));
