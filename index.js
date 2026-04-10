@@ -15,12 +15,18 @@ let config = {
 if (fs.existsSync(configPath)) { config = JSON.parse(fs.readFileSync(configPath)); }
 const guardarConfig = () => fs.writeFileSync(configPath, JSON.stringify(config));
 
-console.log('⏳ Abriendo el navegador invisible...');
+console.log('⏳ Abriendo el navegador súper ligero...');
+
+// 💓 EL MARCAPASOS: Si esto deja de salir en la pantalla negra, Render se desmayó.
+const latido = setInterval(() => {
+    console.log('💓 Render sigue vivo, intentando cargar...');
+}, 5000);
 
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
+        timeout: 60000, // Si se traba más de 1 minuto, explota y nos dice por qué
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox', 
@@ -30,7 +36,9 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--single-process',
-            '--js-flags="--max-old-space-size=512"' // 🔥 OBLIGAMOS A NO USAR TANTA RAM 🔥
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--memory-pressure-off'
         ] 
     },
     webVersionCache: { type: 'none' } 
@@ -38,17 +46,14 @@ const client = new Client({
 
 const BOT_NAME = '🤖 *Lino bot*';
 
-// 📡 EL RADAR: ESTO NOS DIRÁ SI SE ESTÁ MOVIENDO O SE TRABÓ
-client.on('loading_screen', (percent, message) => {
-    console.log(`📡 RADAR: Cargando WhatsApp Web... ${percent}% | ${message}`);
-});
-
 client.on('qr', (qr) => {
+    clearInterval(latido); // Apagamos el marcapasos porque ya lo logramos
     qrcode.generate(qr, {small: true});
-    console.log('📱 ¡POR FIN! ESCANEA ESTE QR RÁPIDO:');
+    console.log('📱 ¡VICTORIA! ESCANEA ESTE QR RÁPIDO:');
 });
 
 client.on('ready', () => {
+    clearInterval(latido);
     console.log('✅ Lino bot está 100% activo.');
 });
 
@@ -70,7 +75,6 @@ client.on('group_admin_changed', async (notification) => {
     if (notification.action === 'promote') {
         const chat = await notification.getChat();
         const promoterId = notification.author; 
-        
         for (let adminId of notification.recipientIds) {
             const mensaje = `┌─『 👑 NUEVO ADMIN 』─┐\n│ 👤 Usuario:\n│ @${adminId.split('@')[0]}\n│ ✅ Ascendido por:\n│ @${promoterId.split('@')[0]}\n└──────────────┘`;
             chat.sendMessage(mensaje, { mentions: [adminId, promoterId] });
@@ -272,4 +276,7 @@ client.on('message', async msg => {
     }
 });
 
-client.initialize().catch(err => console.error('❌ ERROR FATAL:', err));
+client.initialize().catch(err => {
+    clearInterval(latido);
+    console.error('❌ ERROR FATAL AL INICIAR:', err);
+});
